@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Mappls Debug</title>
+
+  <!-- ✅ Put your real static key below -->
+  <script src="https://sdk.mappls.com/map/sdk/web?v=3.0&access_token=nvhnelbhzrhnfzddisdqfnsqbpiifyrsiqzs"></script>
+
+
+  <style>
+    html, body { margin:0; padding:0; height:100%; }
+    #topbar { padding:10px; font-family:Arial; background:#f3f3f3; }
+    #map { width:100%; height:90vh; background:#eee; } /* grey if map doesn't load */
+  </style>
+</head>
+
+<body>
+  <div id="topbar" style="padding:10px;font-family:Arial;background:#f3f3f3;">
+    <b>Pick points:</b> <span id="step">Click START point</span><br>
+    <b>START (lon,lat):</b> <span id="start">-</span><br>
+    <b>END (lon,lat):</b> <span id="end">-</span><br><br>
+
+    <button onclick="resetPoints()">Reset</button>
+    <button onclick="getRoute()">Get Route Geometry</button>
+
+    <div style="margin-top:8px;">
+      <b>Route geometry:</b>
+      <div id="geom" style="font-family:monospace;font-size:12px;white-space:pre-wrap;">-</div>
+    </div>
+  </div>
+
+  <div id="map" style="width:100%; height:90vh;"></div>
+
+  <script>
+    // ✅ Put your SAME Mappls access token (static key) here
+    const ACCESS_TOKEN = "nvhnelbhzrhnfzddisdqfnsqbpiifyrsiqzs";
+
+    var map = new mappls.Map('map', {
+      center: { lat: 28.612964, lng: 77.229463 },
+      zoom: 11
+    });
+
+    var startPt = null, endPt = null;
+    var startMarker = null, endMarker = null;
+
+    function fmt(lon, lat) { return lon.toFixed(6) + "," + lat.toFixed(6); }
+
+    function resetPoints() {
+      startPt = null; endPt = null;
+      document.getElementById("start").innerText = "-";
+      document.getElementById("end").innerText = "-";
+      document.getElementById("geom").innerText = "-";
+      document.getElementById("step").innerText = "Click START point";
+      if (startMarker) startMarker.remove();
+      if (endMarker) endMarker.remove();
+      startMarker = null; endMarker = null;
+    }
+
+    map.on('click', function(e) {
+      var lon = e.lngLat.lng;
+      var lat = e.lngLat.lat;
+
+      if (!startPt) {
+        startPt = { lon, lat };
+        document.getElementById("start").innerText = fmt(lon, lat);
+        document.getElementById("step").innerText = "Click END point";
+        startMarker = new mappls.Marker({ map, position: { lng: lon, lat: lat } });
+      } else if (!endPt) {
+        endPt = { lon, lat };
+        document.getElementById("end").innerText = fmt(lon, lat);
+        document.getElementById("step").innerText = "Now click: Get Route Geometry";
+        endMarker = new mappls.Marker({ map, position: { lng: lon, lat: lat } });
+      }
+    });
+
+    async function getRoute() {
+      if (!startPt || !endPt) {
+        alert("Pick START and END first.");
+        return;
+      }
+
+      const url =
+        `https://route.mappls.com/route/direction/route_adv/driving/` +
+        `${startPt.lon},${startPt.lat};${endPt.lon},${endPt.lat}` +
+        `?access_token=${ACCESS_TOKEN}`;
+
+      console.log("Route URL:", url);
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+
+        const geom = data?.routes?.[0]?.geometry;
+        if (!geom) {
+          document.getElementById("geom").innerText = "No geometry found. Full response in console.";
+          console.log("Full response:", data);
+          return;
+        }
+
+        document.getElementById("geom").innerText = geom; // encoded polyline string
+        console.log("Geometry:", geom);
+      } catch (err) {
+        document.getElementById("geom").innerText = "Error: " + err.message;
+      }
+    }
+  </script>
+</body>
+
+</html>
